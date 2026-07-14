@@ -1,5 +1,6 @@
 #include "grid.h"
 #include "config.h"
+#include "fileio.h"
 #include "utf8.h"
 #include <ncurses.h>
 #include <string.h>
@@ -199,6 +200,7 @@ int render_options_menu(Spreadsheet *sheet)
     WINDOW *win = newwin(win_h, win_w, start_y, start_x);
     if (!win) { nodelay(stdscr, TRUE); return 0; }
 
+    wbkgd(win, COLOR_PAIR(COLOR_PAIR_HEADERS));
     keypad(win, TRUE);
     nodelay(stdscr, FALSE);
 
@@ -294,6 +296,7 @@ void render_theme_selector(Spreadsheet *sheet)
     WINDOW *win = newwin(win_h, win_w, start_y, start_x);
     if (!win) { nodelay(stdscr, TRUE); return; }
 
+    wbkgd(win, COLOR_PAIR(COLOR_PAIR_HEADERS));
     keypad(win, TRUE);
     nodelay(stdscr, FALSE);  /* Blocking wait for this window */
 
@@ -433,6 +436,7 @@ void render_format_dialog(Spreadsheet *sheet)
     WINDOW *win = newwin(win_h, win_w, start_y, start_x);
     if (!win) { nodelay(stdscr, TRUE); return; }
 
+    wbkgd(win, COLOR_PAIR(COLOR_PAIR_HEADERS));
     keypad(win, TRUE);
     nodelay(stdscr, FALSE);
 
@@ -1098,6 +1102,8 @@ void render_help(void)
     WINDOW *help_win = newwin(help_h, help_w, start_y, start_x);
     if (!help_win) return;
 
+    wbkgd(help_win, COLOR_PAIR(COLOR_PAIR_HEADERS));
+
     wattron(help_win, COLOR_PAIR(COLOR_PAIR_HEADERS));
     box(help_win, 0, 0);
     mvwaddstr(help_win, 0, 2, " AYUDA - Hoja de Calculo ");
@@ -1135,4 +1141,112 @@ void render_help(void)
 
     /* Force full redraw */
     touchwin(stdscr);
+}
+
+/* Confirm exit when there are unsaved changes.
+ * Returns true if the user wants to exit, false to cancel. */
+bool render_exit_confirm(Spreadsheet *sheet)
+{
+    int max_y = getmaxy(stdscr);
+    int max_x = getmaxx(stdscr);
+
+    int win_h = 7;
+    int win_w = 42;
+    int start_y = (max_y - win_h) / 2;
+    int start_x = (max_x - win_w) / 2;
+
+    if (start_y < 0) start_y = 0;
+    if (start_x < 0) start_x = 0;
+
+    /* Redraw spreadsheet background first */
+    render_grid(sheet);
+
+    WINDOW *win = newwin(win_h, win_w, start_y, start_x);
+    if (!win) { nodelay(stdscr, TRUE); return true; }
+
+    wbkgd(win, COLOR_PAIR(COLOR_PAIR_HEADERS));
+    keypad(win, TRUE);
+    nodelay(stdscr, FALSE);
+    curs_set(0);  /* Hide cursor for menu navigation */
+
+    int selected = 0;
+    bool exit = false;
+
+    while (!exit) {
+        werase(win);
+
+        wattron(win, COLOR_PAIR(COLOR_PAIR_HEADERS));
+        box(win, 0, 0);
+        mvwaddstr(win, 0, 2, " CAMBIOS SIN GUARDAR ");
+        wattroff(win, COLOR_PAIR(COLOR_PAIR_HEADERS));
+
+        mvwaddstr(win, 1, 3, "Hay cambios sin guardar. Que deseas hacer?");
+
+        static const char *options[3] = {
+            "Guardar y salir",
+            "Salir sin guardar",
+            "Cancelar",
+        };
+
+        for (int i = 0; i < 3; i++) {
+            int y = 3 + i;
+
+            if (i == selected) {
+                wattron(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
+                mvwaddstr(win, y, 3, "> ");
+            } else {
+                mvwaddstr(win, y, 3, "  ");
+            }
+
+            mvwaddstr(win, y, 5, options[i]);
+
+            if (i == selected) {
+                wattroff(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
+            }
+        }
+
+        wrefresh(win);
+
+        int ch = wgetch(win);
+        switch (ch) {
+        case KEY_UP:
+            if (selected > 0) selected--;
+            break;
+        case KEY_DOWN:
+            if (selected < 2) selected++;
+            break;
+        case '\n':
+        case KEY_ENTER: {
+            bool should_exit = false;
+            if (selected == 0) {
+                /* Save and exit */
+                file_save(sheet);
+                should_exit = true;
+            } else if (selected == 1) {
+                /* Exit without saving */
+                should_exit = true;
+            } else {
+                /* Cancel */
+                should_exit = false;
+            }
+            delwin(win);
+            nodelay(stdscr, TRUE);
+            curs_set(1);
+            touchwin(stdscr);
+            return should_exit;
+        }
+        case 27:   /* Escape = cancel */
+            delwin(win);
+            nodelay(stdscr, TRUE);
+            curs_set(1);
+            touchwin(stdscr);
+            return false;
+        }
+    }
+
+    delwin(win);
+    nodelay(stdscr, TRUE);
+    curs_set(1);
+    touchwin(stdscr);
+    return false;
 }

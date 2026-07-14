@@ -117,7 +117,14 @@ int input_handle_normal(Spreadsheet *sheet, int ch)
         switch (action) {
         case 1: render_help();           break;
         case 2: render_theme_selector(sheet); break;
-        case 3: sheet->running = false;  return -1;
+        case 3:
+            if (sheet->dirty_sheet) {
+                if (!render_exit_confirm(sheet)) {
+                    break;  /* User cancelled */
+                }
+            }
+            sheet->running = false;
+            return -1;
         default: break;
         }
         break;
@@ -180,6 +187,11 @@ int input_handle_normal(Spreadsheet *sheet, int ch)
         break;
 
     case 24:    /* Ctrl+X */
+        if (sheet->dirty_sheet) {
+            if (!render_exit_confirm(sheet)) {
+                return 0;  /* User cancelled */
+            }
+        }
         sheet->running = false;
         return -1;
 

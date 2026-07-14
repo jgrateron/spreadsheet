@@ -26,6 +26,7 @@ static bool prompt_filename(char *buf, size_t size, const char *title)
     WINDOW *win = newwin(win_h, win_w, start_y, start_x);
     if (!win) return false;
 
+    wbkgd(win, COLOR_PAIR(COLOR_PAIR_HEADERS));
     keypad(win, TRUE);
     nodelay(stdscr, FALSE);
     curs_set(1);

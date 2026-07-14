@@ -128,6 +128,7 @@ int  deps_recalculate_dependents(Spreadsheet *sheet, int row, int col);
 void render_grid(Spreadsheet *sheet);
 void render_status(Spreadsheet *sheet);
 void render_help(void);
+bool render_exit_confirm(Spreadsheet *sheet);  /* confirm exit when unsaved changes */
 int  render_options_menu(Spreadsheet *sheet);  /* returns action: 0=cancel 1=help 2=theme 3=exit */
 void theme_apply(Theme theme);
 void render_theme_selector(Spreadsheet *sheet);
