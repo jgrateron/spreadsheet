@@ -370,31 +370,68 @@ static int load_from_file(Spreadsheet *sheet, FILE *f, const char *display_name)
     return count;
 }
 
-/* Load from a file path. Returns true on success. */
+/* Resolve a path to an actual filename, trying .ss extension if needed.
+ * Writes the resolved name to 'out' and returns true if the file exists. */
+static bool resolve_path(const char *path, char *out, size_t out_size)
+{
+    FILE *f = fopen(path, "r");
+    if (f) {
+        fclose(f);
+        strncpy(out, path, out_size - 1);
+        out[out_size - 1] = '\0';
+        return true;
+    }
+
+    /* Try adding .ss extension */
+    snprintf(out, out_size, "%s.ss", path);
+    f = fopen(out, "r");
+    if (f) {
+        fclose(f);
+        return true;
+    }
+
+    /* File doesn't exist yet — still resolve the name for future saves.
+     * If the user typed "ejemplo" we store "ejemplo.ss"; if they typed
+     * "ejemplo.ss" we keep it as-is. */
+    size_t len = strlen(path);
+    if (len >= 3 && strcmp(path + len - 3, ".ss") == 0) {
+        /* User already provided .ss extension — use as-is */
+        strncpy(out, path, out_size - 1);
+        out[out_size - 1] = '\0';
+    } else {
+        /* Append .ss for the future save */
+        snprintf(out, out_size, "%s.ss", path);
+    }
+    return false;
+}
+
+/* Load from a file path. Returns true on success.
+ * Even if the file doesn't exist, the resolved filename is remembered
+ * so Ctrl+S saves directly without prompting. */
 bool file_load_path(Spreadsheet *sheet, const char *path)
 {
     if (!path || !*path) return false;
 
     char resolved[MAX_FILENAME];
-    FILE *f = fopen(path, "r");
-    if (f) {
-        strncpy(resolved, path, sizeof(resolved) - 1);
-    } else {
-        /* Try adding .ss extension */
-        snprintf(resolved, sizeof(resolved), "%s.ss", path);
-        f = fopen(resolved, "r");
-        if (!f) return false;
-    }
-    resolved[sizeof(resolved) - 1] = '\0';
+    bool exists = resolve_path(path, resolved, sizeof(resolved));
 
-    load_from_file(sheet, f, resolved);
-    fclose(f);
+    if (exists) {
+        FILE *f = fopen(resolved, "r");
+        if (!f) return false;
+        load_from_file(sheet, f, resolved);
+        fclose(f);
+    } else {
+        /* File doesn't exist yet — start with a blank sheet.
+         * The filename is already resolved and stored below. */
+        snprintf(sheet->status_message, sizeof(sheet->status_message),
+                 "Nuevo: '%s' (archivo no existe, se creara al guardar)", resolved);
+    }
 
     /* Remember filename for future Ctrl+S without prompt */
     strncpy(sheet->filename, resolved, sizeof(sheet->filename) - 1);
     sheet->filename[sizeof(sheet->filename) - 1] = '\0';
 
-    return true;
+    return exists;
 }
 
 /* Load with interactive filename prompt */

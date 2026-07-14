@@ -216,7 +216,19 @@ static double get_cell_value(Spreadsheet *sheet, int row, int col, bool *ok,
     /* If this cell has a formula (or errored formula), recursively evaluate it */
     if (cell->type == CELL_FORMULA ||
         (cell->type == CELL_ERROR && cell->content[0] == '=')) {
-        /* Check for circular reference */
+
+        /* If already diagnosed as circular by topological sort, propagate
+         * the error without re-entering the cycle. */
+        if (cell->type == CELL_ERROR && strcmp(cell->display, "#CIRC!") == 0) {
+            if (error_out && error_size > 0) {
+                strncpy(error_out, "#CIRC!", error_size - 1);
+                error_out[error_size - 1] = '\0';
+            }
+            *ok = false;
+            return 0;
+        }
+
+        /* Check for circular reference via recursive visiting flag */
         if (cell->visiting) {
 #if DEBUG_CIRC
             fprintf(stderr, "DEBUG CIRC: %c%d visiting=true, reporting #CIRC!\n",

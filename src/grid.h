@@ -111,6 +111,12 @@ void deps_record(Cell *cell, int dep_row, int dep_col);
 void deps_invalidate_dependents(Spreadsheet *sheet, int row, int col);
 bool deps_detect_cycle(Spreadsheet *sheet, int row, int col);
 
+/* dependency.c — topological recalculation (cascade propagation) */
+int  deps_collect_transitive_dependents(Spreadsheet *sheet, int row, int col,
+                                         int *out_flat_indices, int max);
+int  deps_topological_evaluate(Spreadsheet *sheet, int *flat_indices, int count);
+int  deps_recalculate_dependents(Spreadsheet *sheet, int row, int col);
+
 /* render.c — ncurses drawing */
 void render_grid(Spreadsheet *sheet);
 void render_status(Spreadsheet *sheet);

@@ -159,10 +159,7 @@ void grid_set_cell(Spreadsheet *sheet, int row, int col, const char *content)
     Cell *cell = grid_get_cell(sheet, row, col);
     if (!cell) return;
 
-    /* Invalidate dependents before changing */
-    deps_invalidate_dependents(sheet, row, col);
-
-    /* Reset cell */
+    /* Clear old state before changing */
     deps_clear(cell);
     cell->type = CELL_EMPTY;
     cell->numeric_value = 0;
@@ -172,6 +169,12 @@ void grid_set_cell(Spreadsheet *sheet, int row, int col, const char *content)
     if (!content || !*content) {
         cell->type = CELL_EMPTY;
         cell->content[0] = '\0';
+        /* Old dependents still need recalculation (references now broken) */
+        int cycles = deps_recalculate_dependents(sheet, row, col);
+        if (cycles > 0) {
+            snprintf(sheet->status_message, sizeof(sheet->status_message),
+                     " #CIRC! %d celda(s) en referencia circular", cycles);
+        }
         return;
     }
 
@@ -179,15 +182,19 @@ void grid_set_cell(Spreadsheet *sheet, int row, int col, const char *content)
     cell->content[MAX_CELL_CONTENT - 1] = '\0';
     cell->type = detect_type(cell->content);
 
-    /* Evaluate this cell */
+    /* Evaluate this cell first (records new dependencies) */
     cell_evaluate(sheet, row, col);
 
-    /* Mark sheet as having unsaved changes */
     sheet->dirty_sheet = true;
 
-    /* Recalculate all dependents */
-    deps_invalidate_dependents(sheet, row, col);
-    grid_recalculate_all(sheet);
+    /* Cascade propagation: recalculate all transitive dependents in
+     * topological order so each cell's dependencies are always
+     * up-to-date, regardless of position in the grid. */
+    int cycles = deps_recalculate_dependents(sheet, row, col);
+    if (cycles > 0) {
+        snprintf(sheet->status_message, sizeof(sheet->status_message),
+                 " #CIRC! %d celda(s) en referencia circular", cycles);
+    }
 }
 
 /* Mark all formula cells dirty */
@@ -202,38 +209,25 @@ void grid_mark_dirty(Spreadsheet *sheet)
     }
 }
 
-/* Recalculate all dirty formula cells */
+/* Recalculate all dirty formula cells using topological order */
 void grid_recalculate_all(Spreadsheet *sheet)
 {
-    /* Reset evaluation state for cycle detection */
+    int flat_indices[MAX_ROWS * MAX_COLS];
+    int count = 0;
+
+    /* Collect all dirty formula cells */
     for (int r = 0; r < MAX_ROWS; r++) {
         for (int c = 0; c < MAX_COLS; c++) {
-            sheet->cells[r][c].visiting = false;
-            sheet->cells[r][c].evaluated = false;
+            Cell *cell = &sheet->cells[r][c];
+            if (cell->dirty && cell->content[0] == '=') {
+                flat_indices[count++] = r * MAX_COLS + c;
+            }
         }
     }
 
-    /* Simple iterative approach: keep evaluating dirty cells until none left */
-    bool changed;
-    int iterations = 0;
-    do {
-        changed = false;
-        for (int r = 0; r < MAX_ROWS; r++) {
-            for (int c = 0; c < MAX_COLS; c++) {
-                Cell *cell = &sheet->cells[r][c];
-                if (cell->dirty && cell->content[0] == '=') {
-                    /* Reset type in case it was set to CELL_ERROR previously */
-                    cell->type = CELL_FORMULA;
-                    /* Clear deps before re-evaluation */
-                    deps_clear(cell);
-                    cell_evaluate(sheet, r, c);
-                    changed = true;
-                }
-            }
-        }
-        iterations++;
-        if (iterations > MAX_ROWS * MAX_COLS) break; /* Safety limit */
-    } while (changed);
+    if (count > 0) {
+        deps_topological_evaluate(sheet, flat_indices, count);
+    }
 }
 
 /* ─── Format mask engine ──────────────────────────────────────────── */
