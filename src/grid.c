@@ -110,7 +110,7 @@ static void cell_evaluate(Spreadsheet *sheet, int row, int col)
         cell->numeric_value = strtod(cell->content, NULL);
         /* Try cell format, column format, then fallback */
         const char *fmt = cell->format[0] ? cell->format : sheet->col_formats[col];
-        if (fmt[0]) {
+        if (fmt && fmt[0]) {
             grid_apply_format(col, cell->numeric_value, fmt, cell->display, MAX_DISPLAY);
         } else {
             double v = cell->numeric_value;
@@ -142,7 +142,7 @@ static void cell_evaluate(Spreadsheet *sheet, int row, int col)
             cell->numeric_value = result;
             cell->type = CELL_FORMULA;
             const char *fmt = cell->format[0] ? cell->format : sheet->col_formats[col];
-            if (fmt[0]) {
+            if (fmt && fmt[0]) {
                 grid_apply_format(col, result, fmt, cell->display, MAX_DISPLAY);
             } else if (result == (long)result) {
                 snprintf(cell->display, MAX_DISPLAY, "%.0f", result);

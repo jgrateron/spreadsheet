@@ -6,6 +6,9 @@ WIDTH B 32
 WIDTH C 12
 WIDTH D 14
 WIDTH E 14
+FORMAT C "0"
+FORMAT D "#,##0.00"
+FORMAT E "#,##0.00"
 CELL A1 चालान
 CELL B1 भारत टेक सॉल्यूशंस प्रा. लि.
 CELL A2 क्रमांक: INV-2024-4521

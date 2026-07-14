@@ -6,6 +6,9 @@ WIDTH B 30
 WIDTH C 12
 WIDTH D 14
 WIDTH E 14
+FORMAT C "0"
+FORMAT D "#,##0.00"
+FORMAT E "#,##0.00"
 CELL A1 فاتورة
 CELL B1 شركة التقنية العربية
 CELL A2 رقم: 2024-0742

@@ -262,7 +262,11 @@ static double get_cell_value(Spreadsheet *sheet, int row, int col, bool *ok,
         cell->dirty = false;
         cell->numeric_value = result;
         cell->type = CELL_FORMULA;
-        if (result == (long)result) {
+        /* Apply column or cell format if set */
+        const char *cfmt = cell->format[0] ? cell->format : sheet->col_formats[col];
+        if (cfmt && cfmt[0]) {
+            grid_apply_format(col, result, cfmt, cell->display, MAX_DISPLAY);
+        } else if (result == (long)result) {
             snprintf(cell->display, MAX_DISPLAY, "%.0f", result);
         } else {
             snprintf(cell->display, MAX_DISPLAY, "%.10g", result);
