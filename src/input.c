@@ -127,6 +127,14 @@ int input_handle_normal(Spreadsheet *sheet, int ch)
         grid_set_cell(sheet, sheet->current_row, sheet->current_col, "");
         break;
 
+    case KEY_F(7):  /* F7 — insert empty row, shift content down */
+        grid_insert_row(sheet, sheet->current_row);
+        break;
+
+    case KEY_F(8):  /* F8 — delete current row, shift content up */
+        grid_delete_row(sheet, sheet->current_row);
+        break;
+
     case 19:    /* Ctrl+S — save */
         file_save(sheet);
         break;

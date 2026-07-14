@@ -100,6 +100,8 @@ void col_row_parse(const char *ref, int *col, int *row);
 void grid_mark_dirty(Spreadsheet *sheet);
 void grid_recalculate_all(Spreadsheet *sheet);
 void grid_apply_format(int col, double value, const char *format, char *out, size_t out_size);
+void grid_insert_row(Spreadsheet *sheet, int row);
+void grid_delete_row(Spreadsheet *sheet, int row);
 
 /* formula.c — parsing & evaluation */
 double evaluate_formula(Spreadsheet *sheet, int row, int col,

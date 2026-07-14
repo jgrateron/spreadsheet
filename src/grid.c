@@ -348,3 +348,183 @@ void grid_apply_format(int col, double value, const char *format,
 
     out[out_pos] = '\0';
 }
+
+/* ─── Row insertion ─────────────────────────────────────────────────── */
+
+/*
+ * Scan a formula string and increment every cell reference whose 0-based
+ * row is >= insert_row by delta (always +1 for an insertion).
+ *
+ * Cell references are of the form [A-Z][0-9]+.  Function names like SUMA
+ * are detected because an alpha-sequence followed by '(' is a function,
+ * not a cell reference.
+ */
+static void grid_shift_formula_rows(char *formula, int insert_row, int delta)
+{
+    char result[MAX_CELL_CONTENT];
+    int out_pos = 0;
+    int i = 0;
+
+    while (formula[i] != '\0' && out_pos < MAX_CELL_CONTENT - 1) {
+        /* Check for alpha character — could be a function name or a cell ref */
+        if (isalpha((unsigned char)formula[i])) {
+            /* Look ahead: if this alpha sequence is followed by '(',
+             * it's a function name — copy verbatim. */
+            int j = i;
+            while (isalpha((unsigned char)formula[j])) j++;
+            int k = j;
+            while (formula[k] == ' ' || formula[k] == '\t') k++;
+            if (formula[k] == '(') {
+                /* Function name — copy up to the '(' exclusive */
+                while (i < k) {
+                    result[out_pos++] = formula[i++];
+                }
+                continue;
+            }
+
+            /* Otherwise treat as a single-letter cell reference.
+             * The column letter is formula[i]; ensure the next char is a digit. */
+            if (isdigit((unsigned char)formula[i + 1])) {
+                /* Copy the column letter */
+                result[out_pos++] = formula[i++];
+
+                /* Parse the 1-based row number */
+                int start = i;
+                while (isdigit((unsigned char)formula[i])) i++;
+
+                char row_str[8];
+                int rl = i - start;
+                if (rl > 7) rl = 7;
+                memcpy(row_str, formula + start, rl);
+                row_str[rl] = '\0';
+
+                int row_1based = (int)strtol(row_str, NULL, 10);
+                int row_0based = row_1based - 1;
+
+                /* Shift rows at or below the insertion point */
+                if (row_0based >= insert_row) {
+                    row_0based += delta;
+                    if (row_0based < 0) row_0based = 0;
+                    if (row_0based >= MAX_ROWS) row_0based = MAX_ROWS - 1;
+                    row_1based = row_0based + 1;
+                }
+
+                /* Write back the (possibly updated) row number */
+                char new_row[16];
+                snprintf(new_row, sizeof(new_row), "%d", (int)row_1based);
+                int new_len = (int)strlen(new_row);
+                for (int n = 0; n < new_len && out_pos < MAX_CELL_CONTENT - 1; n++) {
+                    result[out_pos++] = new_row[n];
+                }
+                continue;
+            }
+        }
+
+        /* Regular character — copy verbatim */
+        result[out_pos++] = formula[i++];
+    }
+
+    result[out_pos] = '\0';
+    strncpy(formula, result, MAX_CELL_CONTENT - 1);
+    formula[MAX_CELL_CONTENT - 1] = '\0';
+}
+
+/*
+ * Insert an empty row at `row` (0-based), shifting all content below it
+ * down by one row.  The last row (MAX_ROWS-1) is lost.
+ *
+ * All formulas in the spreadsheet are scanned and cell references to rows
+ * at or below the insertion point are incremented so they continue to
+ * point to the same logical data.
+ */
+void grid_insert_row(Spreadsheet *sheet, int row)
+{
+    if (row < 0 || row >= MAX_ROWS - 1) {
+        snprintf(sheet->status_message, sizeof(sheet->status_message),
+                 "No se puede insertar: limite de filas alcanzado");
+        return;
+    }
+
+    /* 1. Shift cells down from bottom up to the insertion row.
+     *    The last row's content is discarded. */
+    for (int r = MAX_ROWS - 1; r > row; r--) {
+        memcpy(sheet->cells[r], sheet->cells[r - 1], sizeof(sheet->cells[r]));
+    }
+
+    /* 2. Clear the newly inserted row */
+    for (int c = 0; c < MAX_COLS; c++) {
+        memset(&sheet->cells[row][c], 0, sizeof(Cell));
+        sheet->cells[row][c].type = CELL_EMPTY;
+    }
+
+    /* 3. Update all formulas: increment row references at or below the
+     *    insertion point so they keep pointing to the same logical data. */
+    for (int r = 0; r < MAX_ROWS; r++) {
+        for (int c = 0; c < MAX_COLS; c++) {
+            if (sheet->cells[r][c].content[0] == '=') {
+                grid_shift_formula_rows(sheet->cells[r][c].content, row, 1);
+                /* Also re-detect type and re-evaluate in case the formula
+                 * change affects its classification */
+                sheet->cells[r][c].type = CELL_FORMULA;
+                sheet->cells[r][c].dirty = true;
+            }
+        }
+    }
+
+    /* 4. Recalculate everything */
+    grid_recalculate_all(sheet);
+    sheet->dirty_sheet = true;
+
+    snprintf(sheet->status_message, sizeof(sheet->status_message),
+             "Fila %d insertada", row + 1);
+}
+
+/*
+ * Delete row at `row` (0-based), shifting all content below it up by one
+ * row.  The last row (MAX_ROWS-1) is cleared.
+ *
+ * All formulas in the spreadsheet are scanned and cell references to rows
+ * below the deleted row are decremented so they continue to point to the
+ * same logical data.  References to the deleted row itself are left
+ * pointing to the same position (which now holds shifted content).
+ */
+void grid_delete_row(Spreadsheet *sheet, int row)
+{
+    if (row < 0 || row >= MAX_ROWS - 1) {
+        snprintf(sheet->status_message, sizeof(sheet->status_message),
+                 "No se puede eliminar: limite de filas alcanzado");
+        return;
+    }
+
+    /* 1. Shift cells up from row+1 to the end, overwriting the deleted row.
+     *    The last row becomes empty. */
+    for (int r = row; r < MAX_ROWS - 1; r++) {
+        memcpy(sheet->cells[r], sheet->cells[r + 1], sizeof(sheet->cells[r]));
+    }
+
+    /* 2. Clear the last row (it was shifted up) */
+    for (int c = 0; c < MAX_COLS; c++) {
+        memset(&sheet->cells[MAX_ROWS - 1][c], 0, sizeof(Cell));
+        sheet->cells[MAX_ROWS - 1][c].type = CELL_EMPTY;
+    }
+
+    /* 3. Update all formulas: decrement row references strictly below the
+     *    deleted row so they follow the data that shifted up.  Pass
+     *    threshold = row + 1 so only rows > deleted_row are updated. */
+    for (int r = 0; r < MAX_ROWS; r++) {
+        for (int c = 0; c < MAX_COLS; c++) {
+            if (sheet->cells[r][c].content[0] == '=') {
+                grid_shift_formula_rows(sheet->cells[r][c].content, row + 1, -1);
+                sheet->cells[r][c].type = CELL_FORMULA;
+                sheet->cells[r][c].dirty = true;
+            }
+        }
+    }
+
+    /* 4. Recalculate everything */
+    grid_recalculate_all(sheet);
+    sheet->dirty_sheet = true;
+
+    snprintf(sheet->status_message, sizeof(sheet->status_message),
+             "Fila %d eliminada", row + 1);
+}
