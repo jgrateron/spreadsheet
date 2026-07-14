@@ -305,10 +305,15 @@ void render_theme_selector(Spreadsheet *sheet)
             draw_swatch(win, y, sx,     COLOR_PAIR_SELECTED);
             draw_swatch(win, y, sx + 3, COLOR_PAIR_HEADERS);
             draw_swatch(win, y, sx + 6, COLOR_PAIR_STATUSBAR);
-            int end_x = sx + 8;  /* 3 swatches of 2 chars + 2 gaps */
 
             if (is_current) {
-                for (int x = end_x; x < win_w - 1; x++)
+                /* Re-enable highlight after draw_swatch killed it, then fill
+                 * gaps between swatches and the rest of the row. Swatches
+                 * themselves keep their preview colors. */
+                wattron(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
+                mvwaddch(win, y, sx + 2, ' ');   /* gap after swatch 1 */
+                mvwaddch(win, y, sx + 5, ' ');   /* gap after swatch 2 */
+                for (int x = sx + 8; x < win_w - 1; x++)
                     mvwaddch(win, y, x, ' ');
                 wattroff(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
             }
