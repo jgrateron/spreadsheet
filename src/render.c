@@ -38,6 +38,7 @@ static ThemeInfo theme_registry[THEME_COUNT] = {
     { "Ambar",       "Ambar sobre negro - terminal retro" },
     { "Solarized",   "Paleta Solarized oscura" },
     { "Monocromo",   "Blanco y negro estricto" },
+    { "Claro",       "Fondo blanco y grises claros - estilo hoja de calculo" },
 };
 
 const ThemeInfo *theme_get_info(Theme theme)
@@ -124,6 +125,37 @@ void theme_apply(Theme theme)
         init_pair(COLOR_PAIR_CELL_1, COLOR_BLACK, COLOR_WHITE);
         init_pair(COLOR_PAIR_CELL_2, COLOR_BLACK, COLOR_WHITE);
         init_pair(COLOR_PAIR_CELL_3, COLOR_WHITE, COLOR_BLACK);
+        break;
+
+    case THEME_LIGHT:
+        {
+            /* Light checkerboard: white and very subtle light grays */
+            short lg0 = COLOR_BLACK, lg1 = COLOR_BLACK, lg2 = COLOR_BLACK, lg3 = COLOR_BLACK;
+            if (can_change_color()) {
+                init_color(30, 920, 920, 920);  /* ~#EBEBEB */
+                init_color(31, 960, 960, 960);  /* ~#F5F5F5 */
+                init_color(32, 980, 980, 980);  /* ~#FAFAFA */
+                init_color(33, 1000,1000,1000); /* ~#FFFFFF */
+                lg0 = 30; lg1 = 31; lg2 = 32; lg3 = 33;
+            } else if (COLORS >= 256) {
+                lg0 = 254;  /* #E4E4E4 */
+                lg1 = 255;  /* #EEEEEE */
+                lg2 = 231;  /* #FFFFFF */
+                lg3 = 231;  /* #FFFFFF */
+            }
+            /* Re-init checkerboard with light colors */
+            init_pair(COLOR_PAIR_CELL_0, COLOR_BLACK, lg0);
+            init_pair(COLOR_PAIR_CELL_1, COLOR_BLACK, lg1);
+            init_pair(COLOR_PAIR_CELL_2, COLOR_BLACK, lg2);
+            init_pair(COLOR_PAIR_CELL_3, COLOR_BLACK, lg3);
+
+            init_pair(COLOR_PAIR_SELECTED,  COLOR_WHITE, COLOR_BLUE);
+            init_pair(COLOR_PAIR_ERROR,     COLOR_RED,   lg3);  /* red text on white */
+            init_pair(COLOR_PAIR_THEME_HI,  COLOR_WHITE, COLOR_BLUE);
+            init_pair(COLOR_PAIR_HEADERS,   COLOR_BLACK, lg0);
+            init_pair(COLOR_PAIR_STATUSBAR, COLOR_BLACK, lg0);
+            init_pair(COLOR_PAIR_GRID_TEXT, COLOR_BLACK, lg3);
+        }
         break;
 
     case THEME_DEFAULT:
@@ -814,7 +846,7 @@ static void draw_grid_rows(const Spreadsheet *sheet)
         /* Row header */
         attron(COLOR_PAIR(COLOR_PAIR_HEADERS));
         char row_label[16];
-        snprintf(row_label, sizeof(row_label), "%3d ", row_idx + 1);
+        snprintf(row_label, sizeof(row_label), "%4d ", row_idx + 1);
         mvaddstr(screen_y, 0, row_label);
         attroff(COLOR_PAIR(COLOR_PAIR_HEADERS));
 
@@ -932,8 +964,16 @@ static void draw_grid_rows(const Spreadsheet *sheet)
             screen_x += w;  /* Column boundaries stay fixed */
         }
 
-        /* Draw vertical separator after row header */
-        /* (This is implicit in the layout) */
+        /* Fill remaining space to the right with checkerboard background */
+        int max_x = getmaxx(stdscr);
+        if (screen_x < max_x) {
+            int fill_pair = COLOR_PAIR_CELL_0 + (row_idx % 2) * 2 + 1;
+            attron(COLOR_PAIR(fill_pair));
+            for (int fx = screen_x; fx < max_x; fx++) {
+                mvaddch(screen_y, fx, ' ');
+            }
+            attroff(COLOR_PAIR(fill_pair));
+        }
     }
 }
 

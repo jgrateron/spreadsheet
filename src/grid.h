@@ -33,6 +33,7 @@ typedef enum {
     THEME_AMBER,
     THEME_SOLARIZED,
     THEME_MONOCHROME,
+    THEME_LIGHT,
     THEME_COUNT
 } Theme;
 
