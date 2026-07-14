@@ -5,6 +5,18 @@ Formula evaluation, topological dependency recalculation, number formatting,
 file persistence, themes, unicode support, and variable column widths —
 all from your terminal.
 
+## Screenshots
+
+<p align="center">
+  <img src="resources/img1.png" alt="Factura" width="49%">
+  <img src="resources/img2.png" alt="Nómina" width="49%">
+  <img src="resources/img3.png" alt="Control de gastos mensual" width="49%">
+  <img src="resources/img4.png" alt="Cálculo de notas" width="49%">
+  <img src="resources/img5.png" alt="Inventario tienda" width="49%">
+  <img src="resources/img6.png" alt="Factura en japonés" width="49%">
+  <img src="resources/img7.png" alt="Factura en hindi" width="49%">
+</p>
+
 ## Quick Start
 
 ```bash
@@ -32,7 +44,7 @@ export LANG=C.UTF-8
 - **Circular reference detection**: `#CIRC!` error via DFS
 - **Number formatting**: per-cell or per-column format masks (`#,##0.00`, `0.00%`, etc.)
 - **File I/O**: open/save `.ss` format (Ctrl+O / Ctrl+S)
-- **Themes**: 5 color themes via F2, persisted to `~/.config/spreadsheet/`
+- **Themes**: 6 color themes via F2, persisted to `~/.config/spreadsheet/`
 - **Variable column widths**: adjustable per-column (4–40), saved in file
 - **Default column width**: set with `DEFAULT_WIDTH` directive in `.ss` files
 - **Checkerboard**: alternating cell shading (rows + columns)
@@ -136,6 +148,7 @@ Press **F2** to cycle through themes:
 | Theme | Style |
 |-------|-------|
 | Default | Blue selection on dark |
+| Claro | White & light gray — spreadsheet style |
 | HTOP Dark | Green/cyan — HTOP style |
 | Amber | Retro amber terminal |
 | Solarized | Solarized dark palette |
