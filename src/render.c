@@ -288,10 +288,11 @@ void render_theme_selector(Spreadsheet *sheet)
 
             if (is_current) {
                 wattron(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
-                mvwaddstr(win, y, 3, ">");
-            } else {
-                mvwaddstr(win, y, 3, " ");
             }
+
+            /* Selection marker */
+            mvwaddstr(win, y, 3, is_current ? ">" : " ");
+            mvwaddch(win, y, 4, ' ');
 
             /* Theme name */
             const ThemeInfo *info = theme_get_info((Theme)i);
@@ -299,11 +300,16 @@ void render_theme_selector(Spreadsheet *sheet)
 
             /* Color swatches for preview */
             int sx = 5 + (int)strlen(info->name) + 2;
+            for (int x = 5 + (int)strlen(info->name); x < sx; x++)
+                mvwaddch(win, y, x, ' ');
             draw_swatch(win, y, sx,     COLOR_PAIR_SELECTED);
             draw_swatch(win, y, sx + 3, COLOR_PAIR_HEADERS);
             draw_swatch(win, y, sx + 6, COLOR_PAIR_STATUSBAR);
+            int end_x = sx + 8;  /* 3 swatches of 2 chars + 2 gaps */
 
             if (is_current) {
+                for (int x = end_x; x < win_w - 1; x++)
+                    mvwaddch(win, y, x, ' ');
                 wattroff(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
             }
         }
