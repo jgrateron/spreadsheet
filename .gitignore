@@ -1,0 +1,10 @@
+# Compiled binary
+spreadsheet
+
+# Object files
+obj/
+
+# Editor temp files
+*~
+*.swp
+*.swo

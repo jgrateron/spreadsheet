@@ -1,0 +1,51 @@
+# Spreadsheet v1
+ROWS 100
+COLS 26
+WIDTH A 10
+WIDTH B 32
+WIDTH C 12
+WIDTH D 14
+WIDTH E 14
+CELL A1 चालान
+CELL B1 भारत टेक सॉल्यूशंस प्रा. लि.
+CELL A2 क्रमांक: INV-2024-4521
+CELL B2 GST: 27AABCD1234E1Z5
+CELL A3 दिनांक: 14 जुलाई 2026
+CELL B3 बंगलौर, कर्नाटक - 560001
+CELL A5 ग्राहक: मुंबई सॉफ्टवेयर हाउस
+CELL A6 GST: 27BBCCD5678F2A3
+CELL A7 पता: अंधेरी पूर्व, मुंबई - 400069
+CELL B9 विवरण
+CELL C9 मात्रा
+CELL D9 दर (₹)
+CELL E9 कुल (₹)
+CELL B10 सॉफ्टवेयर विकास
+CELL C10 120
+CELL D10 52000.00
+CELL E10 =C10*D10
+CELL B11 क्लाउड सेवाएं (मासिक)
+CELL C11 6
+CELL D11 7200.00
+CELL E11 =C11*D11
+CELL B12 तकनीकी सहायता (घंटे)
+CELL C12 35
+CELL D12 3600.00
+CELL E12 =C12*D12
+CELL B13 वेब डिज़ाइन
+CELL C13 1
+CELL D13 68000.00
+CELL E13 =C13*D13
+CELL B14 डेटा स्थानांतरण
+CELL C14 18
+CELL D14 4400.00
+CELL E14 =C14*D14
+CELL A16 उप-योग
+CELL E16 =SUMA(E10:E14)
+CELL A17 GST (18%)
+CELL E17 =E16*0.18
+CELL A18 कुल योग
+CELL E18 =E16+E17
+CELL A20 भुगतान विधि: NEFT/RTGS (30 दिन)
+CELL A21 खाता: SBI, बंगलौर शाखा, खाता नं. 12345678901
+CELL A22 IFSC: SBIN0001234
+CELL B20 देय तिथि: 13 अगस्त 2026
