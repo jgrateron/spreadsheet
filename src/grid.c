@@ -528,3 +528,164 @@ void grid_delete_row(Spreadsheet *sheet, int row)
     snprintf(sheet->status_message, sizeof(sheet->status_message),
              "Fila %d eliminada", row + 1);
 }
+
+/* ─── Column insertion / deletion ──────────────────────────────────── */
+
+/*
+ * Scan a formula string and shift every cell reference whose column index
+ * is >= insert_col by delta (+1 for insert, -1 for delete).
+ *
+ * Same scanning logic as grid_shift_formula_rows: function names (alpha
+ * sequence followed by '(') are skipped; cell references [A-Z][0-9]+ have
+ * their column letter shifted.
+ */
+static void grid_shift_formula_cols(char *formula, int insert_col, int delta)
+{
+    char result[MAX_CELL_CONTENT];
+    int out_pos = 0;
+    int i = 0;
+
+    while (formula[i] != '\0' && out_pos < MAX_CELL_CONTENT - 1) {
+        if (isalpha((unsigned char)formula[i])) {
+            /* Look ahead for function name */
+            int j = i;
+            while (isalpha((unsigned char)formula[j])) j++;
+            int k = j;
+            while (formula[k] == ' ' || formula[k] == '\t') k++;
+            if (formula[k] == '(') {
+                while (i < k) {
+                    result[out_pos++] = formula[i++];
+                }
+                continue;
+            }
+
+            /* Single-letter cell reference: column letter + digits */
+            if (isdigit((unsigned char)formula[i + 1])) {
+                int col_idx = col_to_index(formula[i]);
+                if (col_idx >= insert_col) {
+                    col_idx += delta;
+                    if (col_idx < 0) col_idx = 0;
+                    if (col_idx >= MAX_COLS) col_idx = MAX_COLS - 1;
+                }
+                result[out_pos++] = index_to_col(col_idx);
+                i++;
+
+                /* Copy row digits unchanged */
+                while (isdigit((unsigned char)formula[i]) && out_pos < MAX_CELL_CONTENT - 1) {
+                    result[out_pos++] = formula[i++];
+                }
+                continue;
+            }
+        }
+
+        result[out_pos++] = formula[i++];
+    }
+
+    result[out_pos] = '\0';
+    strncpy(formula, result, MAX_CELL_CONTENT - 1);
+    formula[MAX_CELL_CONTENT - 1] = '\0';
+}
+
+/*
+ * Insert an empty column at `col` (0-based), shifting all content to the
+ * right by one column.  The last column (MAX_COLS-1, Z) is lost.
+ *
+ * column widths and format masks are shifted alongside cell data.
+ * All formulas are scanned and column references >= col are incremented.
+ */
+void grid_insert_col(Spreadsheet *sheet, int col)
+{
+    if (col < 0 || col >= MAX_COLS - 1) {
+        snprintf(sheet->status_message, sizeof(sheet->status_message),
+                 "No se puede insertar: limite de columnas alcanzado");
+        return;
+    }
+
+    /* 1. Shift column widths and formats right */
+    for (int c = MAX_COLS - 1; c > col; c--) {
+        sheet->col_widths[c] = sheet->col_widths[c - 1];
+        memcpy(sheet->col_formats[c], sheet->col_formats[c - 1], MAX_FORMAT_LEN);
+    }
+    sheet->col_widths[col] = DEFAULT_COL_WIDTH;
+    sheet->col_formats[col][0] = '\0';
+
+    /* 2. Shift cell data right for every row */
+    for (int r = 0; r < MAX_ROWS; r++) {
+        for (int c = MAX_COLS - 1; c > col; c--) {
+            memcpy(&sheet->cells[r][c], &sheet->cells[r][c - 1], sizeof(Cell));
+        }
+        /* Clear the newly inserted column */
+        memset(&sheet->cells[r][col], 0, sizeof(Cell));
+        sheet->cells[r][col].type = CELL_EMPTY;
+    }
+
+    /* 3. Update all formulas: increment column refs at or right of insertion */
+    for (int r = 0; r < MAX_ROWS; r++) {
+        for (int c = 0; c < MAX_COLS; c++) {
+            if (sheet->cells[r][c].content[0] == '=') {
+                grid_shift_formula_cols(sheet->cells[r][c].content, col, 1);
+                sheet->cells[r][c].type = CELL_FORMULA;
+                sheet->cells[r][c].dirty = true;
+            }
+        }
+    }
+
+    /* 4. Recalculate */
+    grid_recalculate_all(sheet);
+    sheet->dirty_sheet = true;
+
+    snprintf(sheet->status_message, sizeof(sheet->status_message),
+             "Columna %c insertada", index_to_col(col));
+}
+
+/*
+ * Delete column at `col` (0-based), shifting all content to the right
+ * left by one column.  The last column (MAX_COLS-1, Z) is cleared.
+ *
+ * column widths and format masks are shifted alongside cell data.
+ * All formulas are scanned and column references > col are decremented.
+ */
+void grid_delete_col(Spreadsheet *sheet, int col)
+{
+    if (col < 0 || col >= MAX_COLS - 1) {
+        snprintf(sheet->status_message, sizeof(sheet->status_message),
+                 "No se puede eliminar: limite de columnas alcanzado");
+        return;
+    }
+
+    /* 1. Shift column widths and formats left */
+    for (int c = col; c < MAX_COLS - 1; c++) {
+        sheet->col_widths[c] = sheet->col_widths[c + 1];
+        memcpy(sheet->col_formats[c], sheet->col_formats[c + 1], MAX_FORMAT_LEN);
+    }
+    sheet->col_widths[MAX_COLS - 1] = DEFAULT_COL_WIDTH;
+    sheet->col_formats[MAX_COLS - 1][0] = '\0';
+
+    /* 2. Shift cell data left for every row */
+    for (int r = 0; r < MAX_ROWS; r++) {
+        for (int c = col; c < MAX_COLS - 1; c++) {
+            memcpy(&sheet->cells[r][c], &sheet->cells[r][c + 1], sizeof(Cell));
+        }
+        /* Clear the last column */
+        memset(&sheet->cells[r][MAX_COLS - 1], 0, sizeof(Cell));
+        sheet->cells[r][MAX_COLS - 1].type = CELL_EMPTY;
+    }
+
+    /* 3. Update all formulas: decrement column refs strictly right of deletion */
+    for (int r = 0; r < MAX_ROWS; r++) {
+        for (int c = 0; c < MAX_COLS; c++) {
+            if (sheet->cells[r][c].content[0] == '=') {
+                grid_shift_formula_cols(sheet->cells[r][c].content, col + 1, -1);
+                sheet->cells[r][c].type = CELL_FORMULA;
+                sheet->cells[r][c].dirty = true;
+            }
+        }
+    }
+
+    /* 4. Recalculate */
+    grid_recalculate_all(sheet);
+    sheet->dirty_sheet = true;
+
+    snprintf(sheet->status_message, sizeof(sheet->status_message),
+             "Columna %c eliminada", index_to_col(col));
+}

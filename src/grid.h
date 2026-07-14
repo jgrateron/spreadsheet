@@ -102,6 +102,8 @@ void grid_recalculate_all(Spreadsheet *sheet);
 void grid_apply_format(int col, double value, const char *format, char *out, size_t out_size);
 void grid_insert_row(Spreadsheet *sheet, int row);
 void grid_delete_row(Spreadsheet *sheet, int row);
+void grid_insert_col(Spreadsheet *sheet, int col);
+void grid_delete_col(Spreadsheet *sheet, int col);
 
 /* formula.c — parsing & evaluation */
 double evaluate_formula(Spreadsheet *sheet, int row, int col,
