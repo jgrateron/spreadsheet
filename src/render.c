@@ -976,7 +976,7 @@ void render_status(Spreadsheet *sheet)
 
     /* Help hint on right side, aligned to right edge. Shows * when unsaved. */
     char hint[128];
-    snprintf(hint, sizeof(hint), "F1:Opc  F2:Editar  F9:Formato  Ctrl+S:Guardar%s  Ctrl+O:Abrir  Ctrl+X:Salir",
+    snprintf(hint, sizeof(hint), "F1:Opc  F2:Editar  F5:Col+  F6:Col-  F7:Fil+  F8:Fil-  F9:Formato  Ctrl+S:Guardar%s  Ctrl+O:Abrir  Ctrl+X:Salir",
              sheet->dirty_sheet ? "*" : "");
     int hint_len = (int)strlen(hint);
     int hint_x = getmaxx(stdscr) - hint_len - 1;

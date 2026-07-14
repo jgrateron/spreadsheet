@@ -469,10 +469,9 @@ void grid_insert_row(Spreadsheet *sheet, int row)
         for (int c = 0; c < MAX_COLS; c++) {
             if (sheet->cells[r][c].content[0] == '=') {
                 grid_shift_formula_rows(sheet->cells[r][c].content, row, 1);
-                /* Also re-detect type and re-evaluate in case the formula
-                 * change affects its classification */
                 sheet->cells[r][c].type = CELL_FORMULA;
                 sheet->cells[r][c].dirty = true;
+                deps_clear(&sheet->cells[r][c]);  /* stale after memcpy shift */
             }
         }
     }
@@ -523,6 +522,7 @@ void grid_delete_row(Spreadsheet *sheet, int row)
                 grid_shift_formula_rows(sheet->cells[r][c].content, row + 1, -1);
                 sheet->cells[r][c].type = CELL_FORMULA;
                 sheet->cells[r][c].dirty = true;
+                deps_clear(&sheet->cells[r][c]);  /* stale after memcpy shift */
             }
         }
     }
@@ -632,6 +632,7 @@ void grid_insert_col(Spreadsheet *sheet, int col)
                 grid_shift_formula_cols(sheet->cells[r][c].content, col, 1);
                 sheet->cells[r][c].type = CELL_FORMULA;
                 sheet->cells[r][c].dirty = true;
+                deps_clear(&sheet->cells[r][c]);  /* stale after memcpy shift */
             }
         }
     }
@@ -684,6 +685,7 @@ void grid_delete_col(Spreadsheet *sheet, int col)
                 grid_shift_formula_cols(sheet->cells[r][c].content, col + 1, -1);
                 sheet->cells[r][c].type = CELL_FORMULA;
                 sheet->cells[r][c].dirty = true;
+                deps_clear(&sheet->cells[r][c]);  /* stale after memcpy shift */
             }
         }
     }
