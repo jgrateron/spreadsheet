@@ -287,34 +287,26 @@ void render_theme_selector(Spreadsheet *sheet)
             bool is_current = (i == selected);
 
             if (is_current) {
+                /* Fill entire row with highlight background first */
                 wattron(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
+                for (int x = 3; x < win_w - 1; x++)
+                    mvwaddch(win, y, x, ' ');
             }
 
             /* Selection marker */
             mvwaddstr(win, y, 3, is_current ? ">" : " ");
-            mvwaddch(win, y, 4, ' ');
 
             /* Theme name */
             const ThemeInfo *info = theme_get_info((Theme)i);
             mvwaddstr(win, y, 5, info->name);
 
-            /* Color swatches for preview */
+            /* Color swatches for preview (overwrite highlight with own colors) */
             int sx = 5 + (int)strlen(info->name) + 2;
-            for (int x = 5 + (int)strlen(info->name); x < sx; x++)
-                mvwaddch(win, y, x, ' ');
             draw_swatch(win, y, sx,     COLOR_PAIR_SELECTED);
             draw_swatch(win, y, sx + 3, COLOR_PAIR_HEADERS);
             draw_swatch(win, y, sx + 6, COLOR_PAIR_STATUSBAR);
 
             if (is_current) {
-                /* Re-enable highlight after draw_swatch killed it, then fill
-                 * gaps between swatches and the rest of the row. Swatches
-                 * themselves keep their preview colors. */
-                wattron(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
-                mvwaddch(win, y, sx + 2, ' ');   /* gap after swatch 1 */
-                mvwaddch(win, y, sx + 5, ' ');   /* gap after swatch 2 */
-                for (int x = sx + 8; x < win_w - 1; x++)
-                    mvwaddch(win, y, x, ' ');
                 wattroff(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
             }
         }
