@@ -8,8 +8,11 @@
 
 int main(int argc, char *argv[])
 {
-    /* Set locale for wide char support */
+    /* Set locale for wide char support (UTF-8).
+     * Force C numeric locale so strtod/printf always use '.' as decimal
+     * separator, matching the .ss file format and formula syntax. */
     setlocale(LC_ALL, "");
+    setlocale(LC_NUMERIC, "C");
 
     /* Create spreadsheet (before ncurses in case we need to load a file) */
     Spreadsheet sheet;
