@@ -523,36 +523,45 @@ void render_format_dialog(Spreadsheet *sheet)
 
             for (int i = 0; i < FORMAT_PRESETS; i++) {
                 int y = 9 + i;
+                int end_x = 3;  /* track where content ends for fill */
 
                 if (i == selected) {
                     wattron(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
-                    mvwaddstr(win, y, 3, ">");
-                } else {
-                    mvwaddstr(win, y, 3, " ");
                 }
 
+                /* Selection marker */
+                mvwaddstr(win, y, 3, i == selected ? ">" : " ");
+                end_x = 5;
+
+                /* Label */
                 mvwaddstr(win, y, 5, fmt_preset_labels[i]);
+                end_x = 5 + (int)strlen(fmt_preset_labels[i]);
 
                 /* Show arrow + preview for presets with a mask */
                 if (i > 0 && i < FORMAT_PRESETS - 1) {
                     char p[32];
                     grid_apply_format(sheet->current_col, preview_val,
                                       fmt_preset_masks[i], p, sizeof(p));
-                    int px = 5 + (int)strlen(fmt_preset_labels[i]) + 2;
+                    int px = end_x + 2;
                     if (px + 3 + (int)strlen(p) < win_w - 2) {
                         mvwaddstr(win, y, px, "-> ");
                         mvwaddstr(win, y, px + 3, p);
+                        end_x = px + 3 + (int)strlen(p);
                     }
                 }
 
                 if (i == FORMAT_PRESETS - 1 && custom_buf[0]) {
                     /* Show the current custom string */
-                    int px = 5 + (int)strlen(fmt_preset_labels[i]) + 2;
+                    int px = end_x + 2;
                     mvwaddstr(win, y, px, ": ");
                     mvwaddstr(win, y, px + 2, custom_buf);
+                    end_x = px + 2 + (int)strlen(custom_buf);
                 }
 
+                /* Fill rest of line with spaces to extend the highlight */
                 if (i == selected) {
+                    for (int x = end_x; x < win_w - 1; x++)
+                        mvwaddch(win, y, x, ' ');
                     wattroff(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
                 }
             }
