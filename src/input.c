@@ -143,6 +143,10 @@ int input_handle_normal(Spreadsheet *sheet, int ch)
         grid_delete_row(sheet, sheet->current_row);
         break;
 
+    case KEY_F(9):  /* F9 — format cell dialog */
+        render_format_dialog(sheet);
+        break;
+
     case 19:    /* Ctrl+S — save */
         file_save(sheet);
         break;

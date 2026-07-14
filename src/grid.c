@@ -153,6 +153,12 @@ static void cell_evaluate(Spreadsheet *sheet, int row, int col)
     }
 }
 
+/* Re-evaluate a single cell to refresh its display (e.g. after format change) */
+void grid_reevaluate_cell(Spreadsheet *sheet, int row, int col)
+{
+    cell_evaluate(sheet, row, col);
+}
+
 /* Set cell content (called when user confirms edit) */
 void grid_set_cell(Spreadsheet *sheet, int row, int col, const char *content)
 {

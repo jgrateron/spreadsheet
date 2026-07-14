@@ -93,6 +93,7 @@ typedef struct {
 void grid_init(Spreadsheet *sheet);
 void grid_set_cell(Spreadsheet *sheet, int row, int col, const char *content);
 void grid_clear_cell(Spreadsheet *sheet, int row, int col);
+void grid_reevaluate_cell(Spreadsheet *sheet, int row, int col);
 Cell *grid_get_cell(Spreadsheet *sheet, int row, int col);
 int  col_to_index(char col_letter);
 char index_to_col(int index);
@@ -128,6 +129,7 @@ void render_help(void);
 int  render_options_menu(Spreadsheet *sheet);  /* returns action: 0=cancel 1=help 2=theme 3=exit */
 void theme_apply(Theme theme);
 void render_theme_selector(Spreadsheet *sheet);
+void render_format_dialog(Spreadsheet *sheet);
 const ThemeInfo *theme_get_info(Theme theme);
 
 /* input.c — keyboard handling */

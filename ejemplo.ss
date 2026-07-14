@@ -1,6 +1,9 @@
 # Spreadsheet v1
 ROWS 100
 COLS 26
+FORMAT C3 "#,##0"
+FORMAT C4 "#,##0"
+FORMAT C5 "#,##0"
 CELL B3 Saldo actual
 CELL C3 25000
 CELL B4 Transferencia

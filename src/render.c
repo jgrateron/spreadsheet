@@ -353,6 +353,409 @@ void render_theme_selector(Spreadsheet *sheet)
     touchwin(stdscr);
 }
 
+/* ─── F9 Format dialog ─────────────────────────────────────────── */
+
+#define FORMAT_PRESETS 5
+
+static const char *fmt_preset_labels[FORMAT_PRESETS] = {
+    "General (sin formato)",
+    "#,##0",
+    "#,##0.00",
+    "0.00%",
+    "Personalizado...",
+};
+
+static const char *fmt_preset_masks[FORMAT_PRESETS] = {
+    "",
+    "#,##0",
+    "#,##0.00",
+    "0.00%",
+    NULL,  /* custom — user will type */
+};
+
+void render_format_dialog(Spreadsheet *sheet)
+{
+    int max_y = getmaxy(stdscr);
+    int max_x = getmaxx(stdscr);
+
+    Cell *cell = grid_get_cell(sheet, sheet->current_row, sheet->current_col);
+    double preview_val = cell ? cell->numeric_value : 0.0;
+
+    /* If cell has no numeric value, use 1234.56 as demo */
+    if (preview_val == 0.0 && cell && cell->type != CELL_NUMBER && cell->type != CELL_FORMULA)
+        preview_val = 1234.56;
+
+    int win_h = FORMAT_PRESETS + 14;
+    int win_w = 54;
+    int start_y = (max_y - win_h) / 2;
+    int start_x = (max_x - win_w) / 2;
+
+    if (start_y < 0) start_y = 0;
+    if (start_x < 0) start_x = 0;
+
+    render_grid(sheet);
+
+    WINDOW *win = newwin(win_h, win_w, start_y, start_x);
+    if (!win) { nodelay(stdscr, TRUE); return; }
+
+    keypad(win, TRUE);
+    nodelay(stdscr, FALSE);
+
+    /* Pre-select based on current format */
+    const char *cur_fmt = (cell && cell->format[0])
+        ? cell->format
+        : sheet->col_formats[sheet->current_col];
+    int selected = 0;  /* default: General */
+    if (cur_fmt && cur_fmt[0]) {
+        for (int i = 1; i < FORMAT_PRESETS - 1; i++) {
+            if (strcmp(cur_fmt, fmt_preset_masks[i]) == 0) {
+                selected = i;
+                break;
+            }
+        }
+        if (selected == 0) selected = FORMAT_PRESETS - 1; /* custom */
+    }
+
+    bool apply_to_column = false;
+    bool editing_custom = false;
+    char custom_buf[MAX_FORMAT_LEN] = {0};
+    int custom_pos = 0;
+
+    /* Always seed custom buffer with current format as starting point */
+    if (cur_fmt && cur_fmt[0]) {
+        strncpy(custom_buf, cur_fmt, MAX_FORMAT_LEN - 1);
+        custom_buf[MAX_FORMAT_LEN - 1] = '\0';
+        custom_pos = (int)strlen(custom_buf);
+    }
+
+    bool done = false;
+
+    while (!done) {
+        werase(win);
+
+        /* Border and title */
+        wattron(win, COLOR_PAIR(COLOR_PAIR_HEADERS));
+        box(win, 0, 0);
+        mvwaddstr(win, 0, 2, " FORMATO DE CELDA (F9) ");
+        wattroff(win, COLOR_PAIR(COLOR_PAIR_HEADERS));
+
+        /* Row 2: Cell reference and value */
+        char ref[16];
+        snprintf(ref, sizeof(ref), "%c%d",
+                 index_to_col(sheet->current_col), sheet->current_row + 1);
+        mvwaddstr(win, 2, 3, "Celda: ");
+        wattron(win, A_BOLD);
+        mvwaddstr(win, 2, 10, ref);
+        wattroff(win, A_BOLD);
+
+        char val_str[32];
+        if (cell && (cell->type == CELL_NUMBER || cell->type == CELL_FORMULA)) {
+            snprintf(val_str, sizeof(val_str), "%.10g", cell->numeric_value);
+        } else {
+            snprintf(val_str, sizeof(val_str), "(texto/vacia)");
+        }
+        mvwaddstr(win, 2, 16, "Valor: ");
+        mvwaddstr(win, 2, 23, val_str);
+
+        /* Row 3-4: Current format info */
+        mvwaddstr(win, 3, 3, "Formato de celda:  ");
+        if (cell && cell->format[0]) {
+            wattron(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
+            mvwaddstr(win, 3, 22, cell->format);
+            wattroff(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
+        } else {
+            mvwaddstr(win, 3, 22, "(hereda de columna)");
+        }
+
+        char col_fmt_label[32];
+        snprintf(col_fmt_label, sizeof(col_fmt_label), "Formato columna %c:",
+                 index_to_col(sheet->current_col));
+        mvwaddstr(win, 4, 3, col_fmt_label);
+        if (sheet->col_formats[sheet->current_col][0]) {
+            mvwaddstr(win, 4, 22, sheet->col_formats[sheet->current_col]);
+        } else {
+            mvwaddstr(win, 4, 22, "(ninguno)");
+        }
+
+        /* Row 5: Separator */
+        for (int x = 3; x < win_w - 2; x++)
+            mvwaddch(win, 5, x, ACS_HLINE);
+
+        /* Row 6: Preview */
+        char preview[64];
+        if (editing_custom) {
+            if (custom_buf[0]) {
+                grid_apply_format(sheet->current_col, preview_val,
+                                  custom_buf, preview, sizeof(preview));
+            } else {
+                snprintf(preview, sizeof(preview), "%g", preview_val);
+            }
+        } else if (selected == 0) {
+            /* General — no format mask */
+            if (preview_val == (long)preview_val)
+                snprintf(preview, sizeof(preview), "%.0f", preview_val);
+            else
+                snprintf(preview, sizeof(preview), "%.10g", preview_val);
+        } else if (selected == FORMAT_PRESETS - 1) {
+            /* Custom — use buffer */
+            if (custom_buf[0]) {
+                grid_apply_format(sheet->current_col, preview_val,
+                                  custom_buf, preview, sizeof(preview));
+            } else {
+                snprintf(preview, sizeof(preview), "(sin formato)");
+            }
+        } else {
+            grid_apply_format(sheet->current_col, preview_val,
+                              fmt_preset_masks[selected], preview, sizeof(preview));
+        }
+        mvwaddstr(win, 6, 3, "Vista previa: ");
+        wattron(win, A_BOLD);
+        mvwaddstr(win, 6, 17, preview);
+        wattroff(win, A_BOLD);
+
+        /* Row 7: Separator */
+        for (int x = 3; x < win_w - 2; x++)
+            mvwaddch(win, 7, x, ACS_HLINE);
+
+        /* Rows 8+: Format presets */
+        if (!editing_custom) {
+            mvwaddstr(win, 8, 3, "Seleccionar formato:");
+
+            for (int i = 0; i < FORMAT_PRESETS; i++) {
+                int y = 9 + i;
+
+                if (i == selected) {
+                    wattron(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
+                    mvwaddstr(win, y, 3, ">");
+                } else {
+                    mvwaddstr(win, y, 3, " ");
+                }
+
+                mvwaddstr(win, y, 5, fmt_preset_labels[i]);
+
+                /* Show arrow + preview for presets with a mask */
+                if (i > 0 && i < FORMAT_PRESETS - 1) {
+                    char p[32];
+                    grid_apply_format(sheet->current_col, preview_val,
+                                      fmt_preset_masks[i], p, sizeof(p));
+                    int px = 5 + (int)strlen(fmt_preset_labels[i]) + 2;
+                    if (px + 3 + (int)strlen(p) < win_w - 2) {
+                        mvwaddstr(win, y, px, "-> ");
+                        mvwaddstr(win, y, px + 3, p);
+                    }
+                }
+
+                if (i == FORMAT_PRESETS - 1 && custom_buf[0]) {
+                    /* Show the current custom string */
+                    int px = 5 + (int)strlen(fmt_preset_labels[i]) + 2;
+                    mvwaddstr(win, y, px, ": ");
+                    mvwaddstr(win, y, px + 2, custom_buf);
+                }
+
+                if (i == selected) {
+                    wattroff(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
+                }
+            }
+
+            /* Scope selector */
+            int scope_y = 9 + FORMAT_PRESETS + 1;
+            mvwaddstr(win, scope_y, 3, "Aplicar a: ");
+            if (!apply_to_column) {
+                wattron(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
+                mvwaddstr(win, scope_y, 15, "[CELDA]");
+                wattroff(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
+                mvwaddstr(win, scope_y, 24, "  COLUMNA");
+            } else {
+                mvwaddstr(win, scope_y, 15, "  CELDA");
+                wattron(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
+                mvwaddstr(win, scope_y, 24, "[COLUMNA]");
+                wattroff(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
+            }
+        } else {
+            /* Custom format editing mode */
+            mvwaddstr(win, 9, 3, "Formato personalizado:");
+            mvwaddstr(win, 10, 5, "----------------------------------");
+
+            /* Input field */
+            wattron(win, COLOR_PAIR(COLOR_PAIR_SELECTED));
+            mvwaddstr(win, 11, 5, "  ");
+            mvwaddstr(win, 11, 5, custom_buf);
+            /* Fill rest of field */
+            int buf_len = (int)strlen(custom_buf);
+            for (int x = 5 + buf_len; x < 5 + MAX_FORMAT_LEN + 2; x++) {
+                mvwaddch(win, 11, x, ' ');
+            }
+            wattroff(win, COLOR_PAIR(COLOR_PAIR_SELECTED));
+
+            /* Cursor */
+            wmove(win, 11, 5 + custom_pos);
+            curs_set(1);
+
+            /* Help for custom mode */
+            mvwaddstr(win, 13, 5, "0=digito c/relleno  #=digito s/relleno");
+            mvwaddstr(win, 14, 5, ",=separador miles  .=decimal  %=porcentaje");
+        }
+
+        /* Footer */
+        wattron(win, COLOR_PAIR(COLOR_PAIR_HEADERS));
+        if (editing_custom) {
+            mvwaddstr(win, win_h - 2, 3,
+                      " Escriba mascara  Enter:Ok  Esc:Volver  ");
+        } else {
+            mvwaddstr(win, win_h - 2, 3,
+                      " Cursores:Sel  Tab:Ambito  Enter:Ok  Esc:Salir  ");
+        }
+        wattroff(win, COLOR_PAIR(COLOR_PAIR_HEADERS));
+
+        wrefresh(win);
+
+        int ch = wgetch(win);
+
+        if (editing_custom) {
+            /* ── Custom format editing ── */
+            switch (ch) {
+            case '\n':
+            case KEY_ENTER:
+                /* Apply custom format */
+                if (apply_to_column) {
+                    strncpy(sheet->col_formats[sheet->current_col], custom_buf,
+                            MAX_FORMAT_LEN - 1);
+                    sheet->col_formats[sheet->current_col][MAX_FORMAT_LEN - 1] = '\0';
+                    /* Clear cell-level formats in this column */
+                    for (int r = 0; r < MAX_ROWS; r++) {
+                        sheet->cells[r][sheet->current_col].format[0] = '\0';
+                        grid_reevaluate_cell(sheet, r, sheet->current_col);
+                    }
+                } else {
+                    if (cell) {
+                        strncpy(cell->format, custom_buf, MAX_FORMAT_LEN - 1);
+                        cell->format[MAX_FORMAT_LEN - 1] = '\0';
+                        grid_reevaluate_cell(sheet, sheet->current_row,
+                                             sheet->current_col);
+                    }
+                }
+                sheet->dirty_sheet = true;
+                snprintf(sheet->status_message, sizeof(sheet->status_message),
+                         "Formato \"%s\" aplicado a %s",
+                         custom_buf[0] ? custom_buf : "General",
+                         apply_to_column ? "columna" : "celda");
+                done = true;
+                break;
+
+            case 27:   /* Escape */
+                editing_custom = false;
+                break;
+
+            case KEY_BACKSPACE:
+            case 127:
+            case '\b':
+                if (custom_pos > 0) {
+                    custom_pos--;
+                    int len = (int)strlen(custom_buf);
+                    for (int i = custom_pos; i < len; i++)
+                        custom_buf[i] = custom_buf[i + 1];
+                }
+                break;
+
+            case KEY_DC:  /* Delete */
+                {
+                    int len = (int)strlen(custom_buf);
+                    if (custom_pos < len) {
+                        for (int i = custom_pos; i < len; i++)
+                            custom_buf[i] = custom_buf[i + 1];
+                    }
+                }
+                break;
+
+            case KEY_LEFT:
+                if (custom_pos > 0) custom_pos--;
+                break;
+
+            case KEY_RIGHT:
+                if (custom_pos < (int)strlen(custom_buf))
+                    custom_pos++;
+                break;
+
+            case KEY_HOME:
+                custom_pos = 0;
+                break;
+
+            case KEY_END:
+                custom_pos = (int)strlen(custom_buf);
+                break;
+
+            default:
+                /* Printable ASCII characters */
+                if (ch >= 32 && ch <= 126) {
+                    int len = (int)strlen(custom_buf);
+                    if (len + 1 < MAX_FORMAT_LEN) {
+                        for (int i = len; i >= custom_pos; i--)
+                            custom_buf[i + 1] = custom_buf[i];
+                        custom_buf[custom_pos] = (char)ch;
+                        custom_pos++;
+                    }
+                }
+                break;
+            }
+        } else {
+            /* ── Preset selection ── */
+            switch (ch) {
+            case KEY_UP:
+                if (selected > 0) selected--;
+                break;
+            case KEY_DOWN:
+                if (selected < FORMAT_PRESETS - 1) selected++;
+                break;
+            case '\t':
+                apply_to_column = !apply_to_column;
+                break;
+            case '\n':
+            case KEY_ENTER:
+                if (selected == FORMAT_PRESETS - 1) {
+                    /* Enter custom editing mode */
+                    editing_custom = true;
+                } else {
+                    /* Apply preset */
+                    const char *fmt = fmt_preset_masks[selected];
+                    if (apply_to_column) {
+                        strncpy(sheet->col_formats[sheet->current_col], fmt,
+                                MAX_FORMAT_LEN - 1);
+                        sheet->col_formats[sheet->current_col][MAX_FORMAT_LEN - 1] = '\0';
+                        /* Clear all cell-level formats in this column */
+                        for (int r = 0; r < MAX_ROWS; r++) {
+                            sheet->cells[r][sheet->current_col].format[0] = '\0';
+                            grid_reevaluate_cell(sheet, r, sheet->current_col);
+                        }
+                    } else {
+                        if (cell) {
+                            strncpy(cell->format, fmt, MAX_FORMAT_LEN - 1);
+                            cell->format[MAX_FORMAT_LEN - 1] = '\0';
+                            grid_reevaluate_cell(sheet, sheet->current_row,
+                                                 sheet->current_col);
+                        }
+                    }
+                    sheet->dirty_sheet = true;
+                    snprintf(sheet->status_message, sizeof(sheet->status_message),
+                             "Formato \"%s\" aplicado a %s",
+                             fmt[0] ? fmt : "General",
+                             apply_to_column ? "columna" : "celda");
+                    done = true;
+                }
+                break;
+            case 27:   /* Escape */
+            case KEY_F(9):
+                done = true;
+                break;
+            }
+        }
+    }
+
+    curs_set(1);
+    delwin(win);
+    nodelay(stdscr, TRUE);
+    touchwin(stdscr);
+}
+
 /* Draw the column headers (A, B, C...) */
 static void draw_col_headers(const Spreadsheet *sheet)
 {
@@ -560,7 +963,7 @@ void render_status(Spreadsheet *sheet)
 
     /* Help hint on right side, aligned to right edge. Shows * when unsaved. */
     char hint[128];
-    snprintf(hint, sizeof(hint), "F1:Opc  F2:Editar  Ctrl+S:Guardar%s  Ctrl+O:Abrir  Ctrl+X:Salir",
+    snprintf(hint, sizeof(hint), "F1:Opc  F2:Editar  F9:Formato  Ctrl+S:Guardar%s  Ctrl+O:Abrir  Ctrl+X:Salir",
              sheet->dirty_sheet ? "*" : "");
     int hint_len = (int)strlen(hint);
     int hint_x = getmaxx(stdscr) - hint_len - 1;
@@ -631,7 +1034,7 @@ void render_help(void)
     int max_x = getmaxx(stdscr);
 
     /* Create a centered window */
-    int help_h = 21;
+    int help_h = 23;
     int help_w = 55;
     int start_y = (max_y - help_h) / 2;
     int start_x = (max_x - help_w) / 2;
@@ -655,14 +1058,17 @@ void render_help(void)
     mvwaddstr(help_win, 8,  5, "Supr         - Borrar contenido de celda");
     mvwaddstr(help_win, 9,  5, "Escape       - Cancelar edicion");
 
-    mvwaddstr(help_win, 11, 3, "Archivo:");
-    mvwaddstr(help_win, 12, 5, "Ctrl+S       - Guardar (.ss)");
-    mvwaddstr(help_win, 13, 5, "Ctrl+O       - Abrir (.ss)");
+    mvwaddstr(help_win, 11, 3, "Formato:");
+    mvwaddstr(help_win, 12, 5, "F9           - Formato de celda/columna");
 
-    mvwaddstr(help_win, 15, 3, "Formulas (comienzan con =):");
-    mvwaddstr(help_win, 16, 5, "=A1+B2*C3    - Operaciones aritmeticas");
-    mvwaddstr(help_win, 17, 5, "=SUMA(A1:A10)  - Suma de rango");
-    mvwaddstr(help_win, 18, 5, "=PROMEDIO(B1:B5) - Promedio de rango");
+    mvwaddstr(help_win, 14, 3, "Archivo:");
+    mvwaddstr(help_win, 15, 5, "Ctrl+S       - Guardar (.ss)");
+    mvwaddstr(help_win, 16, 5, "Ctrl+O       - Abrir (.ss)");
+
+    mvwaddstr(help_win, 18, 3, "Formulas (comienzan con =):");
+    mvwaddstr(help_win, 19, 5, "=A1+B2*C3    - Operaciones aritmeticas");
+    mvwaddstr(help_win, 20, 5, "=SUMA(A1:A10)  - Suma de rango");
+    mvwaddstr(help_win, 21, 5, "=PROMEDIO(B1:B5) - Promedio de rango");
     wattroff(help_win, COLOR_PAIR(COLOR_PAIR_HEADERS));
 
     wrefresh(help_win);
