@@ -529,8 +529,9 @@ void render_format_dialog(Spreadsheet *sheet)
                     wattron(win, COLOR_PAIR(COLOR_PAIR_THEME_HI));
                 }
 
-                /* Selection marker */
+                /* Selection marker + fill gap to label */
                 mvwaddstr(win, y, 3, i == selected ? ">" : " ");
+                mvwaddch(win, y, 4, ' ');
                 end_x = 5;
 
                 /* Label */
@@ -543,6 +544,9 @@ void render_format_dialog(Spreadsheet *sheet)
                     grid_apply_format(sheet->current_col, preview_val,
                                       fmt_preset_masks[i], p, sizeof(p));
                     int px = end_x + 2;
+                    /* Fill gap between label and preview so highlight covers it */
+                    for (int x = end_x; x < px; x++)
+                        mvwaddch(win, y, x, ' ');
                     if (px + 3 + (int)strlen(p) < win_w - 2) {
                         mvwaddstr(win, y, px, "-> ");
                         mvwaddstr(win, y, px + 3, p);
@@ -553,6 +557,8 @@ void render_format_dialog(Spreadsheet *sheet)
                 if (i == FORMAT_PRESETS - 1 && custom_buf[0]) {
                     /* Show the current custom string */
                     int px = end_x + 2;
+                    for (int x = end_x; x < px; x++)
+                        mvwaddch(win, y, x, ' ');
                     mvwaddstr(win, y, px, ": ");
                     mvwaddstr(win, y, px + 2, custom_buf);
                     end_x = px + 2 + (int)strlen(custom_buf);
