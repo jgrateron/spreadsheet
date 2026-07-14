@@ -429,8 +429,7 @@ void render_format_dialog(Spreadsheet *sheet)
 
     /* Always seed custom buffer with current format as starting point */
     if (cur_fmt && cur_fmt[0]) {
-        strncpy(custom_buf, cur_fmt, MAX_FORMAT_LEN - 1);
-        custom_buf[MAX_FORMAT_LEN - 1] = '\0';
+        snprintf(custom_buf, MAX_FORMAT_LEN, "%s", cur_fmt);
         custom_pos = (int)strlen(custom_buf);
     }
 
@@ -639,9 +638,8 @@ void render_format_dialog(Spreadsheet *sheet)
             case KEY_ENTER:
                 /* Apply custom format */
                 if (apply_to_column) {
-                    strncpy(sheet->col_formats[sheet->current_col], custom_buf,
-                            MAX_FORMAT_LEN - 1);
-                    sheet->col_formats[sheet->current_col][MAX_FORMAT_LEN - 1] = '\0';
+                    snprintf(sheet->col_formats[sheet->current_col],
+                             MAX_FORMAT_LEN, "%s", custom_buf);
                     /* Clear cell-level formats in this column */
                     for (int r = 0; r < MAX_ROWS; r++) {
                         sheet->cells[r][sheet->current_col].format[0] = '\0';
@@ -649,8 +647,7 @@ void render_format_dialog(Spreadsheet *sheet)
                     }
                 } else {
                     if (cell) {
-                        strncpy(cell->format, custom_buf, MAX_FORMAT_LEN - 1);
-                        cell->format[MAX_FORMAT_LEN - 1] = '\0';
+                        snprintf(cell->format, MAX_FORMAT_LEN, "%s", custom_buf);
                         grid_reevaluate_cell(sheet, sheet->current_row,
                                              sheet->current_col);
                     }
@@ -739,9 +736,8 @@ void render_format_dialog(Spreadsheet *sheet)
                     /* Apply preset */
                     const char *fmt = fmt_preset_masks[selected];
                     if (apply_to_column) {
-                        strncpy(sheet->col_formats[sheet->current_col], fmt,
-                                MAX_FORMAT_LEN - 1);
-                        sheet->col_formats[sheet->current_col][MAX_FORMAT_LEN - 1] = '\0';
+                        snprintf(sheet->col_formats[sheet->current_col],
+                                 MAX_FORMAT_LEN, "%s", fmt);
                         /* Clear all cell-level formats in this column */
                         for (int r = 0; r < MAX_ROWS; r++) {
                             sheet->cells[r][sheet->current_col].format[0] = '\0';
@@ -749,8 +745,7 @@ void render_format_dialog(Spreadsheet *sheet)
                         }
                     } else {
                         if (cell) {
-                            strncpy(cell->format, fmt, MAX_FORMAT_LEN - 1);
-                            cell->format[MAX_FORMAT_LEN - 1] = '\0';
+                            snprintf(cell->format, MAX_FORMAT_LEN, "%s", fmt);
                             grid_reevaluate_cell(sheet, sheet->current_row,
                                                  sheet->current_col);
                         }
