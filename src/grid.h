@@ -87,6 +87,7 @@ typedef struct {
     char col_formats[MAX_COLS][MAX_FORMAT_LEN]; /* Per-column format mask (""=none) */
     int  default_width;          /* Default column width from file (0=unset) */
     Theme theme;
+    char clipboard[MAX_CELL_CONTENT];  /* Copied cell content (Ctrl+K to copy, Ctrl+U to paste) */
 } Spreadsheet;
 
 /* grid.c — cell & grid operations */

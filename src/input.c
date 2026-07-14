@@ -155,6 +155,30 @@ int input_handle_normal(Spreadsheet *sheet, int ch)
         file_load(sheet);
         break;
 
+    case 11: {  /* Ctrl+K — copy cell content */
+        Cell *c = grid_get_cell(sheet, sheet->current_row, sheet->current_col);
+        if (c && c->type != CELL_EMPTY) {
+            strncpy(sheet->clipboard, c->content, MAX_CELL_CONTENT - 1);
+            sheet->clipboard[MAX_CELL_CONTENT - 1] = '\0';
+            snprintf(sheet->status_message, sizeof(sheet->status_message),
+                     "Copiado: %s", sheet->clipboard);
+        } else {
+            sheet->clipboard[0] = '\0';
+            snprintf(sheet->status_message, sizeof(sheet->status_message),
+                     "Celda vacía — nada que copiar");
+        }
+        break;
+    }
+
+    case 21:  /* Ctrl+U — paste clipboard content */
+        if (sheet->clipboard[0] != '\0') {
+            grid_set_cell(sheet, sheet->current_row, sheet->current_col,
+                          sheet->clipboard);
+            snprintf(sheet->status_message, sizeof(sheet->status_message),
+                     "Pegado: %s", sheet->clipboard);
+        }
+        break;
+
     case 24:    /* Ctrl+X */
         sheet->running = false;
         return -1;
